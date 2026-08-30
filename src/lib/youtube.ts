@@ -118,7 +118,6 @@ export async function getInnertube(): Promise<Innertube> {
     const cookie = await getYouTubeCookies();
     ytInstance = await Innertube.create({
       cache: new UniversalCache(false),
-      generate_session_locally: true,
       cookie,
     });
   }
