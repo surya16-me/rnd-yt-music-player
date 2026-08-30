@@ -5,6 +5,7 @@ import { Play, Pause, Heart, Plus, Volume2 } from 'lucide-react';
 import { Track } from '@/types/music';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { formatTime } from '@/lib/formatTime';
+import { onThumbError } from '@/lib/img';
 
 interface TrackRowProps {
   track: Track;
@@ -75,6 +76,7 @@ export default function TrackRow({ track, index, trackList, onOpenArtist }: Trac
             alt={track.title}
             className="w-full h-full object-cover"
             loading="lazy"
+            onError={(e) => onThumbError(e, track.id)}
           />
         </div>
         <div className="min-w-0 flex-1">
@@ -109,8 +111,8 @@ export default function TrackRow({ track, index, trackList, onOpenArtist }: Trac
             e.stopPropagation();
             toggleLike(track.id);
           }}
-          className={`opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 ${
-            isLiked ? 'opacity-100 text-[#1DB954]' : 'text-zinc-400 hover:text-white'
+          className={`opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:scale-110 ${
+            isLiked ? 'text-[#1DB954]' : 'text-zinc-400 hover:text-white'
           }`}
           title={isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
         >
@@ -122,7 +124,7 @@ export default function TrackRow({ track, index, trackList, onOpenArtist }: Trac
             e.stopPropagation();
             addToQueue(track);
           }}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-white hover:scale-110"
+          className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-white hover:scale-110"
           title="Add to queue"
         >
           <Plus className="w-4 h-4" />

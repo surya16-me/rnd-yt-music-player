@@ -23,7 +23,7 @@ export default function Sidebar({ activeTab, setActiveTab, onSelectPlaylist }: S
   const { likedTrackIds } = usePlayerStore();
 
   return (
-    <aside className="w-64 bg-black shrink-0 flex flex-col h-full border-r border-zinc-900 select-none">
+    <aside className="hidden md:flex w-64 bg-black shrink-0 flex-col h-full border-r border-zinc-900 select-none">
       {/* App Logo */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('home')}>

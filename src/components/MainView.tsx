@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   Play,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Track } from '@/types/music';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { onThumbError } from '@/lib/img';
 import TrackCard from './TrackCard';
 import TrackRow from './TrackRow';
 import ArtistView from './ArtistView';
@@ -83,26 +84,46 @@ export default function MainView({
     loadTrending();
   }, []);
 
-  // Search logic with debounce
-  useEffect(() => {
-    if (!searchQuery || searchQuery.trim() === '') {
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Perform a search, cancelling any previous in-flight request to avoid
+  // out-of-order results overwriting newer ones.
+  const performSearch = async (q: string) => {
+    const query = q.trim();
+    if (!query) {
+      setSearchResults([]);
+      setIsSearching(false);
       return;
     }
-
-    const timer = setTimeout(async () => {
-      try {
-        setIsSearching(true);
-        const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
-        const data = await res.json();
-        if (data.tracks) {
-          setSearchResults(data.tracks);
-        }
-      } catch (err) {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setIsSearching(true);
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+        signal: controller.signal,
+      });
+      const data = await res.json();
+      if (controller.signal.aborted) return;
+      if (data.tracks) {
+        setSearchResults(data.tracks);
+      }
+    } catch (err) {
+      if (!controller.signal.aborted) {
         console.error('Failed to search tracks:', err);
-      } finally {
+      }
+    } finally {
+      if (!controller.signal.aborted) {
         setIsSearching(false);
       }
-    }, 400);
+    }
+  };
+
+  // Search logic with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      performSearch(searchQuery);
+    }, searchQuery.trim() ? 400 : 0);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -110,6 +131,11 @@ export default function MainView({
   const handleTagClick = (tag: string) => {
     setSearchQuery(tag);
     setActiveTab('search');
+    // Re-tapping the already-active tag doesn't change state, so force a
+    // re-search manually.
+    if (searchQuery === tag) {
+      performSearch(tag);
+    }
   };
 
   const handleOpenArtist = (name: string, artistId?: string) => {
@@ -134,9 +160,9 @@ export default function MainView({
   return (
     <main className="flex-1 flex flex-col h-full bg-[#121212] overflow-hidden">
       {/* Top Bar */}
-      <header className="h-16 px-8 flex items-center justify-between bg-black/40 backdrop-blur-md sticky top-0 z-30 border-b border-white/5">
-        <div className="flex items-center gap-4 flex-1 max-w-xl">
-          <div className="flex items-center gap-2">
+      <header className="h-14 md:h-16 px-4 sm:px-8 flex items-center justify-between bg-black/40 backdrop-blur-md sticky top-0 z-30 border-b border-white/5">
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 max-w-xl">
+          <div className="hidden md:flex items-center gap-2">
             <button
               onClick={() => setActiveTab('home')}
               className="w-8 h-8 rounded-full bg-black/70 hover:bg-black flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
@@ -168,7 +194,7 @@ export default function MainView({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="hidden sm:flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#1DB954] to-emerald-300 flex items-center justify-center font-bold text-black text-sm shadow-md">
             S
           </div>
@@ -176,7 +202,7 @@ export default function MainView({
       </header>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8 scrollbar-thin scrollbar-thumb-zinc-800">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 sm:py-6 space-y-8 scrollbar-thin scrollbar-thumb-zinc-800">
         {/* ======================= ARTIST VIEW ======================= */}
         {selectedArtist && (
           <ArtistView
@@ -192,7 +218,7 @@ export default function MainView({
           <>
             {/* Hero / Greeting */}
             <div>
-              <h1 className="text-3xl font-extrabold text-white mb-6">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white mb-5 sm:mb-6">
                 {greeting}, Bro! 👋
               </h1>
 
@@ -220,10 +246,10 @@ export default function MainView({
 
             {/* Trending Section */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Flame className="w-6 h-6 text-amber-500" />
-                  <h2 className="text-2xl font-bold text-white tracking-tight">
+              <div className="flex items-center justify-between mb-4 gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Flame className="w-5 h-5 sm:w-6 sm:h-6 text-amber-500 shrink-0" />
+                  <h2 className="text-lg sm:text-2xl font-bold text-white tracking-tight truncate">
                     Trending & Populer Hari Ini
                   </h2>
                 </div>
@@ -336,6 +362,7 @@ export default function MainView({
                       src={searchResults[0].thumbnail}
                       alt={searchResults[0].title}
                       className="w-24 h-24 rounded-lg object-cover mb-4 shadow-md"
+                      onError={(e) => onThumbError(e, searchResults[0].id)}
                     />
                     <h3 className="text-2xl font-extrabold text-white mb-1 truncate">
                       {searchResults[0].title}
@@ -408,16 +435,16 @@ export default function MainView({
         {!selectedArtist && activeTab === 'liked' && (
           <div className="space-y-6">
             {/* Header banner */}
-            <div className="flex items-end gap-6 bg-gradient-to-t from-[#121212] to-indigo-900/60 p-6 rounded-2xl border border-indigo-500/20">
-              <div className="w-44 h-44 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-400 flex items-center justify-center shadow-2xl flex-shrink-0">
-                <Heart className="w-20 h-20 text-white fill-white" />
+            <div className="flex items-end gap-4 sm:gap-6 bg-linear-to-t from-[#121212] to-indigo-900/60 p-4 sm:p-6 rounded-2xl border border-indigo-500/20">
+              <div className="w-24 h-24 sm:w-44 sm:h-44 rounded-xl bg-linear-to-br from-indigo-600 to-purple-400 flex items-center justify-center shadow-2xl shrink-0">
+                <Heart className="w-10 h-10 sm:w-20 sm:h-20 text-white fill-white" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <span className="text-xs uppercase font-bold text-indigo-300">Playlist</span>
-                <h1 className="text-4xl lg:text-5xl font-black text-white mt-1 mb-3">
+                <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white mt-1 mb-2 sm:mb-3 truncate">
                   Liked Songs
                 </h1>
-                <p className="text-xs text-zinc-300">
+                <p className="text-xs text-zinc-300 truncate">
                   {likedTrackIds.length} lagu tersimpan di koleksimu
                 </p>
               </div>

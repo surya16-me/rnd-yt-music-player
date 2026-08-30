@@ -68,6 +68,20 @@ function upgradeThumbnail(url: string): string {
     .replace(/=s(\d+)/, (_m, s: string) => `=s${Math.max(parseInt(s, 10), 480)}`);
 }
 
+// Pick a usable thumbnail URL. youtubei.js may surface `maxresdefault.jpg`,
+// which 404s for many videos, so swap it for the always-available `hqdefault`.
+function resolveThumbnail(thumbnails: RawThumb[] | undefined, videoId: string): string {
+  let url = '';
+  for (const t of thumbnails || []) {
+    if (t.url) url = t.url; // last non-empty wins = largest
+  }
+  if (!url) url = `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+  if (/\/maxresdefault\.jpg/.test(url)) {
+    url = url.replace(/\/maxresdefault\.jpg/, '/hqdefault.jpg');
+  }
+  return upgradeThumbnail(url);
+}
+
 let ytInstance: Innertube | null = null;
 
 export async function getInnertube(): Promise<Innertube> {
@@ -90,11 +104,7 @@ export async function searchTracks(query: string): Promise<Track[]> {
       return songs
         .filter((song) => song.id)
         .map((song) => {
-        const thumbnail = upgradeThumbnail(
-          song.thumbnails?.[song.thumbnails.length - 1]?.url ||
-            song.thumbnail?.contents?.[0]?.url ||
-            `https://i.ytimg.com/vi/${song.id}/hqdefault.jpg`
-        );
+        const thumbnail = resolveThumbnail(song.thumbnails || song.thumbnail?.contents, song.id || '');
 
         return {
           id: song.id || '',
@@ -115,10 +125,7 @@ export async function searchTracks(query: string): Promise<Track[]> {
     return videos
       .filter((v) => v.id)
       .map((v) => {
-      const thumbnail = upgradeThumbnail(
-        v.thumbnails?.[v.thumbnails.length - 1]?.url ||
-          `https://i.ytimg.com/vi/${v.id}/hqdefault.jpg`
-      );
+      const thumbnail = resolveThumbnail(v.thumbnails, v.id || '');
 
       return {
         id: v.id || '',
@@ -169,11 +176,7 @@ export async function getRelatedTracks(videoId: string): Promise<Track[]> {
         .filter(Boolean);
       if (artists.length === 0) continue;
 
-      const thumbnail = upgradeThumbnail(
-        video.thumbnail?.[0]?.url ||
-          video.thumbnail?.[video.thumbnail.length - 1]?.url ||
-          `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`
-      );
+      const thumbnail = resolveThumbnail(video.thumbnail, video.video_id);
 
       tracks.push({
         id: video.video_id,
@@ -191,6 +194,23 @@ export async function getRelatedTracks(videoId: string): Promise<Track[]> {
   } catch (error) {
     console.error('Error fetching related tracks:', error);
     return [];
+  }
+}
+
+export async function getLyrics(videoId: string): Promise<{ text: string; source?: string } | null> {
+  try {
+  const yt = await getInnertube();
+  const shelf = await yt.music.getLyrics(videoId);
+  if (!shelf) return null;
+  const text = shelf.description?.text?.trim();
+  if (!text) return null;
+  return {
+    text,
+    source: shelf.footer?.text || undefined,
+  };
+  } catch {
+    // No lyrics available for this video (getLyrics throws when the tab is missing)
+    return null;
   }
 }
 

@@ -91,7 +91,7 @@ export default function AudioEngine() {
       artist: currentTrack.artist,
       album: currentTrack.album || 'YouTube Music',
       artwork: [
-        { src: currentTrack.thumbnail, sizes: '512x512', type: 'image/jpeg' },
+        { src: currentTrack.thumbnail, sizes: '512x512' },
       ],
     });
 

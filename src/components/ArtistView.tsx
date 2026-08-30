@@ -71,8 +71,8 @@ export default function ArtistView({
       ) : artist && artist.tracks.length > 0 ? (
         <>
           {/* Header banner */}
-          <div className="flex items-end gap-6 bg-linear-to-t from-[#121212] to-emerald-900/40 p-6 rounded-2xl border border-emerald-500/10">
-            <div className="w-44 h-44 rounded-full overflow-hidden bg-zinc-800 flex items-center justify-center shadow-2xl shrink-0">
+          <div className="flex items-end gap-4 sm:gap-6 bg-linear-to-t from-[#121212] to-emerald-900/40 p-4 sm:p-6 rounded-2xl border border-emerald-500/10">
+            <div className="w-24 h-24 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-zinc-800 flex items-center justify-center shadow-2xl shrink-0">
               {artist.thumbnail ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
@@ -81,7 +81,7 @@ export default function ArtistView({
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <User className="w-20 h-20 text-zinc-600" />
+                <User className="w-10 h-10 sm:w-20 sm:h-20 text-zinc-600" />
               )}
             </div>
             <div className="min-w-0">
@@ -89,7 +89,7 @@ export default function ArtistView({
                 <Mic2 className="w-3.5 h-3.5" />
                 Artis
               </span>
-              <h1 className="text-4xl lg:text-5xl font-black text-white mt-1 mb-2 truncate">
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black text-white mt-1 mb-2 truncate">
                 {artist.name}
               </h1>
               <p className="text-xs text-zinc-300">{artist.tracks.length} lagu</p>

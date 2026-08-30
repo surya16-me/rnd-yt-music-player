@@ -5,12 +5,16 @@ import Sidebar from '@/components/Sidebar';
 import MainView from '@/components/MainView';
 import PlayerBar from '@/components/PlayerBar';
 import QueueDrawer from '@/components/QueueDrawer';
+import BottomNav from '@/components/BottomNav';
+import FullPlayer from '@/components/FullPlayer';
 import AudioEngine from '@/components/AudioEngine';
+import { usePlayerStore } from '@/store/usePlayerStore';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<'home' | 'search' | 'library' | 'liked'>('home');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedArtist, setSelectedArtist] = useState<{ name: string; artistId?: string } | null>(null);
+  const { isFullPlayerOpen, toggleFullPlayer } = usePlayerStore();
 
   const handleSelectPlaylist = (query: string) => {
     setSearchQuery(query);
@@ -20,6 +24,10 @@ export default function App() {
   const handleSetActiveTab = (tab: 'home' | 'search' | 'library' | 'liked') => {
     setSelectedArtist(null);
     setActiveTab(tab);
+  };
+
+  const handleOpenArtist = (name: string, artistId?: string) => {
+    setSelectedArtist({ name, artistId });
   };
 
   return (
@@ -52,6 +60,14 @@ export default function App() {
 
       {/* Bottom Sticky Spotify-style Player Bar */}
       <PlayerBar />
+
+      {/* Mobile Bottom Navigation (desktop keeps the left sidebar) */}
+      <BottomNav activeTab={activeTab} setActiveTab={handleSetActiveTab} />
+
+      {/* Full-screen Now Playing overlay */}
+      {isFullPlayerOpen && (
+        <FullPlayer onClose={() => toggleFullPlayer(false)} onOpenArtist={handleOpenArtist} />
+      )}
     </div>
   );
 }

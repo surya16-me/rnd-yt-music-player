@@ -3,6 +3,7 @@
 import React from 'react';
 import { X, Trash2, Music } from 'lucide-react';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { onThumbError } from '@/lib/img';
 
 export default function QueueDrawer() {
   const {
@@ -20,9 +21,8 @@ export default function QueueDrawer() {
 
   const upcomingTracks = queue.slice(queueIndex + 1);
 
-  return (
-    <div className="w-80 bg-[#121212] border-l border-zinc-800 flex flex-col h-full shrink-0 z-40 select-none">
-      {/* Header */}
+  const renderQueueBody = () => (
+    <>
       <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Music className="w-5 h-5 text-[#1DB954]" />
@@ -42,15 +42,14 @@ export default function QueueDrawer() {
           <button
             onClick={toggleQueue}
             className="text-zinc-400 hover:text-white p-1 rounded-full hover:bg-zinc-800"
+            aria-label="Close queue"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* Queue Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 scrollbar-thin scrollbar-thumb-zinc-800">
-        {/* Now Playing */}
         {currentTrack && (
           <div>
             <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">
@@ -62,6 +61,7 @@ export default function QueueDrawer() {
                 src={currentTrack.thumbnail}
                 alt={currentTrack.title}
                 className="w-11 h-11 rounded object-cover shrink-0"
+                onError={(e) => onThumbError(e, currentTrack.id)}
               />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-[#1DB954] truncate">
@@ -75,7 +75,6 @@ export default function QueueDrawer() {
           </div>
         )}
 
-        {/* Next Up */}
         <div>
           <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2 flex items-center justify-between">
             <span>Next in Queue</span>
@@ -106,6 +105,7 @@ export default function QueueDrawer() {
                       src={track.thumbnail}
                       alt={track.title}
                       className="w-9 h-9 rounded object-cover shrink-0"
+                      onError={(e) => onThumbError(e, track.id)}
                     />
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-white truncate group-hover:text-[#1DB954]">
@@ -132,6 +132,28 @@ export default function QueueDrawer() {
           )}
         </div>
       </div>
-    </div>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop: right sidebar (in flex flow) */}
+      <div className="hidden md:flex w-80 bg-[#121212] border-l border-zinc-800 flex-col h-full shrink-0 z-40 select-none">
+        {renderQueueBody()}
+      </div>
+
+      {/* Mobile: full bottom sheet */}
+      <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end select-none">
+        <button
+          onClick={toggleQueue}
+          className="absolute inset-0 bg-black/60"
+          aria-label="Close queue"
+        />
+        <div className="relative bg-[#121212] rounded-t-2xl border-t border-zinc-800 max-h-[85vh] flex flex-col shadow-2xl pb-[env(safe-area-inset-bottom)]">
+          <div className="mx-auto w-10 h-1 rounded-full bg-zinc-700 my-2 shrink-0" />
+          {renderQueueBody()}
+        </div>
+      </div>
+    </>
   );
 }

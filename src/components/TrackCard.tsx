@@ -4,6 +4,7 @@ import React from 'react';
 import { Play, Pause } from 'lucide-react';
 import { Track } from '@/types/music';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { onThumbError } from '@/lib/img';
 
 interface TrackCardProps {
   track: Track;
@@ -36,6 +37,7 @@ export default function TrackCard({ track, trackList, onOpenArtist }: TrackCardP
           alt={track.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
+          onError={(e) => onThumbError(e, track.id)}
         />
 
         {/* Floating Spotify Play Button */}
@@ -44,7 +46,7 @@ export default function TrackCard({ track, trackList, onOpenArtist }: TrackCardP
           className={`absolute bottom-2 right-2 w-11 h-11 rounded-full bg-[#1DB954] hover:bg-[#1ed760] hover:scale-105 flex items-center justify-center text-black shadow-xl shadow-black/50 transition-all duration-300 ${
             isCurrent
               ? 'opacity-100 translate-y-0'
-              : 'opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0'
+              : 'opacity-100 translate-y-0 md:opacity-0 md:translate-y-2 md:group-hover:opacity-100 md:group-hover:translate-y-0'
           }`}
           aria-label={isCurrent && isPlaying ? 'Pause' : 'Play'}
         >

@@ -14,6 +14,7 @@ interface PlayerState {
   isLooping: boolean;
   isShuffling: boolean;
   isQueueOpen: boolean;
+  isFullPlayerOpen: boolean;
   likedTrackIds: string[];
   history: Track[];
 
@@ -31,6 +32,7 @@ interface PlayerState {
   toggleLoop: () => void;
   toggleShuffle: () => void;
   toggleQueue: () => void;
+  toggleFullPlayer: (open?: boolean) => void;
   toggleLike: (trackId: string) => void;
   addToQueue: (track: Track) => void;
   removeFromQueue: (index: number) => void;
@@ -55,6 +57,7 @@ export const usePlayerStore = create<PlayerState>()(
       isLooping: false,
       isShuffling: false,
       isQueueOpen: false,
+      isFullPlayerOpen: false,
       likedTrackIds: [],
       history: [],
 
@@ -189,6 +192,12 @@ export const usePlayerStore = create<PlayerState>()(
   toggleLoop: () => set((state) => ({ isLooping: !state.isLooping })),
   toggleShuffle: () => set((state) => ({ isShuffling: !state.isShuffling })),
   toggleQueue: () => set((state) => ({ isQueueOpen: !state.isQueueOpen })),
+  toggleFullPlayer: (open) =>
+    set((state) => ({
+      isFullPlayerOpen: typeof open === 'boolean' ? open : !state.isFullPlayerOpen,
+      // Full player and queue overlay shouldn't both be up on mobile
+      isQueueOpen: typeof open === 'boolean' && open ? false : state.isQueueOpen,
+    })),
 
   toggleLike: (trackId) =>
     set((state) => {
