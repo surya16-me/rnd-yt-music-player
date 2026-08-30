@@ -72,8 +72,8 @@ export default function PlayerBar() {
   return (
     <footer className="h-24 bg-[#181818] border-t border-zinc-800 px-4 py-2 flex items-center justify-between select-none z-50">
       {/* Left: Track Info */}
-      <div className="flex items-center gap-3.5 w-1/4 min-w-[180px] max-w-[300px]">
-        <div className="relative w-14 h-14 rounded-md overflow-hidden bg-zinc-800 flex-shrink-0 shadow-md">
+      <div className="flex items-center gap-3.5 w-1/4 min-w-45 max-w-75">
+        <div className="relative w-14 h-14 rounded-md overflow-hidden bg-zinc-800 shrink-0 shadow-md">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={currentTrack.thumbnail}
@@ -93,7 +93,7 @@ export default function PlayerBar() {
 
         <button
           onClick={() => toggleLike(currentTrack.id)}
-          className={`transition-colors hover:scale-110 flex-shrink-0 ${
+          className={`transition-colors hover:scale-110 shrink-0 ${
             isLiked ? 'text-[#1DB954]' : 'text-zinc-400 hover:text-white'
           }`}
         >
@@ -102,7 +102,7 @@ export default function PlayerBar() {
       </div>
 
       {/* Center: Controls & Seekbar */}
-      <div className="flex flex-col items-center gap-1.5 w-2/4 max-w-[650px]">
+      <div className="flex flex-col items-center gap-1.5 w-2/4 max-w-162.5">
         {/* Buttons */}
         <div className="flex items-center gap-5">
           <button
@@ -178,7 +178,7 @@ export default function PlayerBar() {
       </div>
 
       {/* Right: Tools & Volume */}
-      <div className="flex items-center justify-end gap-3 w-1/4 min-w-[160px]">
+      <div className="flex items-center justify-end gap-3 w-1/4 min-w-40">
         <button
           onClick={toggleQueue}
           className={`transition-colors p-1 rounded ${

@@ -68,7 +68,7 @@ export default function TrackRow({ track, index, trackList, onOpenArtist }: Trac
 
       {/* Col 2: Title & Artist & Thumbnail */}
       <div className="col-span-6 flex items-center gap-3 pr-2 min-w-0">
-        <div className="w-10 h-10 flex-shrink-0 rounded overflow-hidden bg-zinc-800">
+        <div className="w-10 h-10 shrink-0 rounded overflow-hidden bg-zinc-800">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={track.thumbnail}

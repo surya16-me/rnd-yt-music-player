@@ -1,16 +1,7 @@
-import { execFile } from 'child_process';
-import { existsSync } from 'fs';
-import { promisify } from 'util';
 import { Innertube, UniversalCache } from 'youtubei.js';
 import { ArtistInfo, Track } from '@/types/music';
 import { formatTime } from '@/lib/formatTime';
-
-const execFileAsync = promisify(execFile);
-
-const YTDLP_BIN =
-  process.env.YTDLP_PATH ||
-  ['/opt/homebrew/bin/yt-dlp', '/usr/local/bin/yt-dlp'].find((p) => existsSync(p)) ||
-  'yt-dlp';
+import { getPoToken } from '@/lib/potoken';
 
 const streamUrlCache = new Map<string, { url: string; expires: number }>();
 
@@ -42,15 +33,21 @@ interface RawVideo {
   duration?: { seconds?: number; text?: string };
 }
 
+interface RawUpNextVideo {
+  video_id?: string;
+  title?: string | { text?: string };
+  authors?: RawArtistRef[];
+  artists?: RawArtistRef[];
+  author?: string;
+  thumbnail?: RawThumb[];
+  duration?: { seconds?: number; text?: string };
+}
+
 interface RawShelfSection {
   type?: string;
   title?: string | { text?: string };
   endpoint?: { payload?: { browseId?: string } };
   contents?: RawSong[];
-}
-
-interface RawSectionList {
-  contents?: RawShelfSection[];
 }
 
 interface RawArtistHeader {
@@ -153,40 +150,44 @@ export async function getTrendingTracks(): Promise<Track[]> {
 export async function getRelatedTracks(videoId: string): Promise<Track[]> {
   try {
     const yt = await getInnertube();
-    const sectionList = await yt.music.getRelated(videoId);
-    const sections = (sectionList as unknown as RawSectionList).contents || [];
+    // "Up next" panel is purpose-built for continuing a queue from the current
+    // song, which gives a more relevant/consecutive set than the generic shelf.
+    const panel = await yt.music.getUpNext(videoId);
+    const items = panel.contents || [];
 
-    let songs: RawSong[] = [];
-    for (const section of sections) {
-      if (section.type === 'MusicCarouselShelf') {
-        const items = ((section.contents || []) as RawSong[]).filter(
-          (song) => song.id && Array.isArray(song.artists) && song.artists.length > 0
-        );
-        if (items.length > 0) {
-          songs = items;
-          break;
-        }
-      }
-    }
+    const tracks: Track[] = [];
+    for (const raw of items) {
+      // Wrapped items carry the actual video on `.primary`
+      const candidate = raw as RawUpNextVideo & { primary?: RawUpNextVideo | null };
+      const video: RawUpNextVideo | null | undefined =
+        candidate.primary ? candidate.primary : candidate;
 
-    return songs.map((song) => {
+      if (!video?.video_id) continue;
+
+      const artists = (video.artists || [])
+        .map((a: RawArtistRef) => a.name)
+        .filter(Boolean);
+      if (artists.length === 0) continue;
+
       const thumbnail = upgradeThumbnail(
-        song.thumbnail?.contents?.[0]?.url ||
-          song.thumbnails?.[song.thumbnails.length - 1]?.url ||
-          `https://i.ytimg.com/vi/${song.id}/hqdefault.jpg`
+        video.thumbnail?.[0]?.url ||
+          video.thumbnail?.[video.thumbnail.length - 1]?.url ||
+          `https://i.ytimg.com/vi/${video.video_id}/hqdefault.jpg`
       );
 
-      return {
-        id: song.id || '',
-        title: typeof song.title === 'string' ? song.title : song.title?.text || 'Unknown Title',
-        artist: song.artists?.map((a: RawArtistRef) => a.name).join(', ') || song.author?.name || 'Unknown Artist',
-        artistId: song.artists?.[0]?.channel_id,
-        album: typeof song.album === 'string' ? song.album : song.album?.name || '',
+      tracks.push({
+        id: video.video_id,
+        title: typeof video.title === 'string' ? video.title : video.title?.text || 'Unknown Title',
+        artist: artists.join(', ') || video.author || 'Unknown Artist',
+        artistId: video.artists?.[0]?.channel_id,
+        album: '',
         thumbnail,
-        duration: song.duration?.seconds || 0,
-        durationText: song.duration?.text || '',
-      };
-    });
+        duration: video.duration?.seconds || 0,
+        durationText: video.duration?.text || '',
+      });
+    }
+
+    return tracks;
   } catch (error) {
     console.error('Error fetching related tracks:', error);
     return [];
@@ -294,38 +295,15 @@ export async function getStreamUrl(videoId: string): Promise<string | null> {
     return cached.url;
   }
 
-  const ytDlpUrl = await getYtDlpStreamUrl(videoId);
-  if (ytDlpUrl) {
-    cacheStreamUrl(videoId, ytDlpUrl);
-    return ytDlpUrl;
+  // Pure-Node PO token (WebPO) extractor, yielding a full stream without
+  // relying on any external binary.
+  const poTokenUrl = await getInnertubeStreamUrl(videoId);
+  if (poTokenUrl) {
+    cacheStreamUrl(videoId, poTokenUrl);
+    return poTokenUrl;
   }
 
-  return getInnertubeStreamUrl(videoId);
-}
-
-async function getYtDlpStreamUrl(videoId: string): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync(
-      YTDLP_BIN,
-      [
-        '--quiet',
-        '--no-warnings',
-        '--no-playlist',
-        '--get-url',
-        '-f',
-        'bestaudio[ext=m4a]/bestaudio',
-        videoId,
-      ],
-      { timeout: 20000, maxBuffer: 10 * 1024 * 1024 }
-    );
-
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    const url = lines[lines.length - 1]?.trim();
-    return url && url.startsWith('http') ? url : null;
-  } catch (error) {
-    console.error(`Error getting stream URL via yt-dlp for ${videoId}:`, error);
-    return null;
-  }
+  return null;
 }
 
 function cacheStreamUrl(videoId: string, url: string) {
@@ -343,6 +321,27 @@ function cacheStreamUrl(videoId: string, url: string) {
 }
 
 async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
+  // Prefer the WebPO (Proof of Origin) path: mint a content-bound token and
+  // append it as ?pot= so YouTube lets us stream the FULL audio file.
+  try {
+    const [poToken, yt] = await Promise.all([getPoToken(videoId), getInnertube()]);
+    if (poToken) {
+      const info = await yt.getBasicInfo(videoId, { client: 'YTMUSIC' });
+      const format = info.chooseFormat({ quality: 'best', type: 'audio' });
+      if (format?.has_audio) {
+        const decodedUrl = await format.decipher(yt.session.player);
+        if (decodedUrl) {
+          const url = new URL(decodedUrl);
+          url.searchParams.set('pot', poToken);
+          return url.toString();
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error getting WebPO stream URL for ${videoId}:`, error);
+  }
+
+  // Fallback: legacy clients (limited to ~384KB without a PO token)
   try {
     const yt = await getInnertube();
     const info = await yt.getInfo(videoId, { client: 'IOS' });
@@ -352,18 +351,10 @@ async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
     if (audioFormats.length > 0 && audioFormats[0].url) {
       return audioFormats[0].url;
     }
-
-    // Fallback to Android client or standard formats
-    const infoAndroid = await yt.getInfo(videoId, { client: 'ANDROID' });
-    const androidFormats = infoAndroid.streaming_data?.adaptive_formats || [];
-    const audioAndroid = androidFormats.filter((f) => f.has_audio && !f.has_video);
-    if (audioAndroid.length > 0 && audioAndroid[0].url) {
-      return audioAndroid[0].url;
-    }
-
-    return null;
   } catch (error) {
     console.error(`Error getting stream URL for ${videoId}:`, error);
     return null;
   }
+
+  return null;
 }

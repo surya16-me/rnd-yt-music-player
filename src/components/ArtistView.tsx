@@ -71,8 +71,8 @@ export default function ArtistView({
       ) : artist && artist.tracks.length > 0 ? (
         <>
           {/* Header banner */}
-          <div className="flex items-end gap-6 bg-gradient-to-t from-[#121212] to-emerald-900/40 p-6 rounded-2xl border border-emerald-500/10">
-            <div className="w-44 h-44 rounded-full overflow-hidden bg-zinc-800 flex items-center justify-center shadow-2xl flex-shrink-0">
+          <div className="flex items-end gap-6 bg-linear-to-t from-[#121212] to-emerald-900/40 p-6 rounded-2xl border border-emerald-500/10">
+            <div className="w-44 h-44 rounded-full overflow-hidden bg-zinc-800 flex items-center justify-center shadow-2xl shrink-0">
               {artist.thumbnail ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img

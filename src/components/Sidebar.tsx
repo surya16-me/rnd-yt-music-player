@@ -23,7 +23,7 @@ export default function Sidebar({ activeTab, setActiveTab, onSelectPlaylist }: S
   const { likedTrackIds } = usePlayerStore();
 
   return (
-    <aside className="w-64 bg-black flex-shrink-0 flex flex-col h-full border-r border-zinc-900 select-none">
+    <aside className="w-64 bg-black shrink-0 flex flex-col h-full border-r border-zinc-900 select-none">
       {/* App Logo */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('home')}>
@@ -77,7 +77,7 @@ export default function Sidebar({ activeTab, setActiveTab, onSelectPlaylist }: S
       </div>
 
       <div className="my-4 px-4">
-        <div className="h-[1px] bg-zinc-800" />
+        <div className="h-px bg-zinc-800" />
       </div>
 
       {/* Secondary Actions */}
@@ -90,7 +90,7 @@ export default function Sidebar({ activeTab, setActiveTab, onSelectPlaylist }: S
               : 'text-zinc-400 hover:text-white'
           }`}
         >
-          <div className="w-6 h-6 rounded bg-gradient-to-br from-indigo-600 to-purple-400 flex items-center justify-center">
+          <div className="w-6 h-6 rounded bg-linear-to-br from-indigo-600 to-purple-400 flex items-center justify-center">
             <Heart className="w-3.5 h-3.5 text-white fill-white" />
           </div>
           <span>Liked Songs</span>
@@ -113,7 +113,7 @@ export default function Sidebar({ activeTab, setActiveTab, onSelectPlaylist }: S
             onClick={() => onSelectPlaylist && onSelectPlaylist(pl.query)}
             className="w-full text-left px-2 py-1.5 text-sm text-zinc-400 hover:text-white hover:underline truncate transition-colors flex items-center gap-2"
           >
-            <Disc className="w-3.5 h-3.5 text-zinc-600 flex-shrink-0" />
+            <Disc className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
             <span className="truncate">{pl.name}</span>
           </button>
         ))}

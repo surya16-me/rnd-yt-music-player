@@ -21,7 +21,7 @@ export default function QueueDrawer() {
   const upcomingTracks = queue.slice(queueIndex + 1);
 
   return (
-    <div className="w-80 bg-[#121212] border-l border-zinc-800 flex flex-col h-full flex-shrink-0 z-40 select-none">
+    <div className="w-80 bg-[#121212] border-l border-zinc-800 flex flex-col h-full shrink-0 z-40 select-none">
       {/* Header */}
       <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -61,7 +61,7 @@ export default function QueueDrawer() {
               <img
                 src={currentTrack.thumbnail}
                 alt={currentTrack.title}
-                className="w-11 h-11 rounded object-cover flex-shrink-0"
+                className="w-11 h-11 rounded object-cover shrink-0"
               />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-[#1DB954] truncate">
@@ -105,7 +105,7 @@ export default function QueueDrawer() {
                     <img
                       src={track.thumbnail}
                       alt={track.title}
-                      className="w-9 h-9 rounded object-cover flex-shrink-0"
+                      className="w-9 h-9 rounded object-cover shrink-0"
                     />
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-white truncate group-hover:text-[#1DB954]">
