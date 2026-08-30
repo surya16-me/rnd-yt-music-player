@@ -1,7 +1,11 @@
-import { Innertube, UniversalCache } from 'youtubei.js';
+import { Innertube, UniversalCache, Platform } from 'youtubei.js';
 import { ArtistInfo, Track } from '@/types/music';
 import { formatTime } from '@/lib/formatTime';
 import { getPoToken } from '@/lib/potoken';
+
+Platform.shim.eval = async (data) => {
+  return new Function(data.output)();
+};
 
 const streamUrlCache = new Map<string, { url: string; expires: number }>();
 
@@ -398,7 +402,12 @@ async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
       });
       const format = info.chooseFormat({ quality: 'best', type: 'audio' });
       if (format?.has_audio) {
-        const decodedUrl = await format.decipher(yt.session.player);
+        let decodedUrl: string | undefined;
+        if (format.url) {
+          decodedUrl = format.url;
+        } else if (format.signature_cipher || format.cipher) {
+          decodedUrl = await format.decipher(yt.session.player);
+        }
         if (decodedUrl) {
           const url = new URL(decodedUrl);
           if (poToken) {
