@@ -346,7 +346,13 @@ async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
   try {
     const [poToken, yt] = await Promise.all([getPoToken(videoId), getInnertube()]);
     if (poToken) {
-      const info = await yt.getBasicInfo(videoId, { client: 'YTMUSIC' });
+      // Attach the PO token to the player request itself. From datacenter IPs
+      // (Vercel) YouTube withholds streaming_data unless a valid content-bound
+      // PO token is sent via serviceIntegrityDimensions.poToken.
+      const info = await yt.getBasicInfo(videoId, {
+        client: 'YTMUSIC',
+        po_token: poToken,
+      });
       const format = info.chooseFormat({ quality: 'best', type: 'audio' });
       if (format?.has_audio) {
         const decodedUrl = await format.decipher(yt.session.player);
