@@ -11,6 +11,95 @@ interface WebPoSignalOutputFunction {
 }
 type WebPoSignalOutput = (WebPoSignalOutputFunction | undefined)[];
 
+// jsdom doesn't implement HTMLCanvasElement (it needs the native `canvas`
+// package, which is painful on Vercel/Lambda). The BotGuard VM fingerprinting
+// calls canvas.getContext('2d') and readImageData, so we hand it a fake 2D
+// context with no-op methods + blank pixel buffers.
+function createFakeCanvasContext() {
+  const context = {
+    canvas: null,
+    fillStyle: '#000000',
+    strokeStyle: '#000000',
+    font: '10px sans-serif',
+    textAlign: 'start',
+    textBaseline: 'alphabetic',
+    lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    miterLimit: 10,
+    globalAlpha: 1,
+    globalCompositeOperation: 'source-over',
+    imageSmoothingEnabled: true,
+    shadowBlur: 0,
+    shadowColor: 'rgba(0, 0, 0, 0)',
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    direction: 'inherit',
+    fillRect() {},
+    clearRect() {},
+    strokeRect() {},
+    fillText() {},
+    strokeText() {},
+    save() {},
+    restore() {},
+    beginPath() {},
+    moveTo() {},
+    lineTo() {},
+    closePath() {},
+    stroke() {},
+    fill() {},
+    clip() {},
+    rect() {},
+    arc() {},
+    arcTo() {},
+    ellipse() {},
+    translate() {},
+    scale() {},
+    rotate() {},
+    transform() {},
+    setTransform() {},
+    resetTransform() {},
+    setLineDash() {},
+    getLineDash() {
+      return [];
+    },
+    drawImage() {},
+    createImageData(width: number, height: number) {
+      return { data: new Uint8ClampedArray(width * height * 4) };
+    },
+    getImageData() {
+      return { data: new Uint8ClampedArray(4) };
+    },
+    putImageData() {},
+    measureText() {
+      return { width: 0, actualBoundingBoxAscent: 0, actualBoundingBoxDescent: 0 };
+    },
+    createLinearGradient() {
+      return { addColorStop() {} };
+    },
+    createRadialGradient() {
+      return { addColorStop() {} };
+    },
+    createConicGradient() {
+      return { addColorStop() {} };
+    },
+    createPattern() {
+      return {};
+    },
+    isPointInPath() {
+      return false;
+    },
+    isPointInStroke() {
+      return false;
+    },
+    getContextAttributes() {
+      return {};
+    },
+    reset() {},
+  };
+  return context;
+}
+
 // This module is server-only (Next.js route handlers). It generates Proof of
 // Origin (PO) tokens so YouTube lets us stream the FULL audio file instead of
 // cutting us off after ~384KB with a 403.
@@ -33,6 +122,37 @@ async function loadBotGuard() {
     url: 'https://www.youtube.com',
     referrer: 'https://www.youtube.com/',
     resources: new ResourceLoader({ userAgent: USER_AGENT }),
+    beforeParse(window) {
+      const fakeCtx = createFakeCanvasContext();
+      (window.HTMLCanvasElement.prototype.getContext as unknown) = function () {
+        return fakeCtx;
+      };
+      (window.HTMLCanvasElement.prototype.toDataURL as unknown) = function () {
+        return 'data:image/png;base64,';
+      };
+      (window.HTMLCanvasElement.prototype.toBlob as unknown) = function (
+        cb: (blob: Blob | null) => void
+      ) {
+        cb(new window.Blob([]));
+      };
+      window.OffscreenCanvas = class {
+        width: number;
+        height: number;
+        constructor(width: number, height: number) {
+          this.width = width;
+          this.height = height;
+        }
+        getContext() {
+          return fakeCtx;
+        }
+        toDataURL() {
+          return 'data:image/png;base64,';
+        }
+        convertToBlob() {
+          return Promise.resolve(new window.Blob([]));
+        }
+      } as unknown as typeof OffscreenCanvas;
+    },
   });
 
   const pageResponse = await fetch('https://www.youtube.com', {
