@@ -341,57 +341,48 @@ function cacheStreamUrl(videoId: string, url: string) {
 }
 
 async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
-  // Prefer the WebPO (Proof of Origin) path: mint a content-bound token and
-  // append it as ?pot= so YouTube lets us stream the FULL audio file.
-  try {
-    const [poToken, yt] = await Promise.all([getPoToken(videoId), getInnertube()]);
-    if (poToken) {
-      // Attach the PO token to the player request itself. From datacenter IPs
-      // (Vercel) YouTube withholds streaming_data unless a valid content-bound
-      // PO token is sent via serviceIntegrityDimensions.poToken.
-      for (const client of ['YTMUSIC', 'WEB'] as const) {
-        let info: Awaited<ReturnType<typeof yt.getInfo>> | null = null;
-        try {
-          info = await yt.getInfo(videoId, { client, po_token: poToken });
-          const format = info.chooseFormat({ quality: 'best', type: 'audio' });
-          if (format?.has_audio) {
-            const decodedUrl = await format.decipher(yt.session.player);
-            if (decodedUrl) {
-              const url = new URL(decodedUrl);
-              url.searchParams.set('pot', poToken);
-              return url.toString();
-            }
+  const [poToken, yt] = await Promise.all([getPoToken(videoId), getInnertube()]);
+
+  // Some clients (WEB, YTMUSIC) withhold streaming_data on datacenter IPs
+  // unless a PO token is attached to the player request; others (IOS,
+  // ANDROID, MWEB) serve it directly. Try them in order.
+  const attempts: Array<{ client: 'YTMUSIC' | 'WEB' | 'IOS' | 'ANDROID' | 'MWEB'; withPot: boolean }> = [
+    { client: 'YTMUSIC', withPot: true },
+    { client: 'WEB', withPot: true },
+    { client: 'IOS', withPot: false },
+    { client: 'ANDROID', withPot: false },
+    { client: 'MWEB', withPot: false },
+  ];
+
+  for (const { client, withPot } of attempts) {
+    let info: Awaited<ReturnType<typeof yt.getInfo>> | null = null;
+    try {
+      info = await yt.getInfo(videoId, {
+        client,
+        po_token: withPot && poToken ? poToken : undefined,
+      });
+      const format = info.chooseFormat({ quality: 'best', type: 'audio' });
+      if (format?.has_audio) {
+        const decodedUrl = await format.decipher(yt.session.player);
+        if (decodedUrl) {
+          const url = new URL(decodedUrl);
+          if (poToken) {
+            url.searchParams.set('pot', poToken);
           }
-        } catch (error) {
-          const pr = (info as unknown as {
-            page?: Array<{ playability_status?: { status?: string; reason?: string } }>;
-          } | null)?.page?.[0]?.playability_status;
-          console.error(
-            `WebPO stream for ${videoId} (${client}) failed:`,
-            error instanceof Error ? error.message : error,
-            '| playability:',
-            pr
-          );
+          return url.toString();
         }
       }
+    } catch (error) {
+      const pr = (info as unknown as {
+        page?: Array<{ playability_status?: { status?: string; reason?: string } }>;
+      } | null)?.page?.[0]?.playability_status;
+      console.error(
+        `Stream for ${videoId} (${client}${withPot ? '+pot' : ''}) failed:`,
+        error instanceof Error ? error.message : error,
+        '| playability:',
+        pr
+      );
     }
-  } catch (error) {
-    console.error(`Error getting WebPO stream URL for ${videoId}:`, error);
-  }
-
-  // Fallback: legacy clients (limited to ~384KB without a PO token)
-  try {
-    const yt = await getInnertube();
-    const info = await yt.getInfo(videoId, { client: 'IOS' });
-    const formats = info.streaming_data?.adaptive_formats || [];
-    const audioFormats = formats.filter((f) => f.has_audio && !f.has_video);
-
-    if (audioFormats.length > 0 && audioFormats[0].url) {
-      return audioFormats[0].url;
-    }
-  } catch (error) {
-    console.error(`Error getting stream URL for ${videoId}:`, error);
-    return null;
   }
 
   return null;
