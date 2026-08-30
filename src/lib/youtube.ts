@@ -349,7 +349,7 @@ async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
       // Attach the PO token to the player request itself. From datacenter IPs
       // (Vercel) YouTube withholds streaming_data unless a valid content-bound
       // PO token is sent via serviceIntegrityDimensions.poToken.
-      const info = await yt.getBasicInfo(videoId, {
+      const info = await yt.getInfo(videoId, {
         client: 'YTMUSIC',
         po_token: poToken,
       });
