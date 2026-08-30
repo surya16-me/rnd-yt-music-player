@@ -91,7 +91,10 @@ let ytInstance: Innertube | null = null;
 // grab the anonymous visitor cookies YouTube sets on a plain page fetch.
 async function getYouTubeCookies(): Promise<string | undefined> {
   if (process.env.YOUTUBE_COOKIES) {
-    return process.env.YOUTUBE_COOKIES;
+    const cookie = process.env.YOUTUBE_COOKIES.trim().replace(/^["']|["']$/g, '');
+    const hasSapisid = cookie.includes('SAPISID');
+    console.log(`[youtube] Using custom YOUTUBE_COOKIES (length: ${cookie.length}, hasSAPISID: ${hasSapisid})`);
+    return cookie;
   }
   try {
     const res = await fetch('https://www.youtube.com', {
@@ -372,9 +375,14 @@ async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
   const [poToken, yt] = await Promise.all([getPoToken(videoId), getInnertube()]);
 
   // Some clients (WEB, YTMUSIC) withhold streaming_data on datacenter IPs
-  // unless a PO token is attached to the player request; others (IOS,
-  // ANDROID, MWEB) serve it directly. Try them in order.
-  const attempts: Array<{ client: 'YTMUSIC' | 'WEB' | 'IOS' | 'ANDROID' | 'MWEB'; withPot: boolean }> = [
+  // unless a PO token is attached to the player request; others (ANDROID_VR,
+  // VISIONOS, IOS, ANDROID, MWEB) serve it directly. Try them in order.
+  const attempts: Array<{
+    client: 'ANDROID_VR' | 'VISIONOS' | 'YTMUSIC' | 'WEB' | 'IOS' | 'ANDROID' | 'MWEB';
+    withPot: boolean;
+  }> = [
+    { client: 'ANDROID_VR', withPot: false },
+    { client: 'VISIONOS', withPot: false },
     { client: 'YTMUSIC', withPot: true },
     { client: 'WEB', withPot: true },
     { client: 'IOS', withPot: false },
