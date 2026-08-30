@@ -84,11 +84,39 @@ function resolveThumbnail(thumbnails: RawThumb[] | undefined, videoId: string): 
 
 let ytInstance: Innertube | null = null;
 
+// Vercel's datacenter IPs are heavily bot-flagged: YouTube answers every
+// player request with "Sign in to confirm you're not a bot" (LOGIN_REQUIRED),
+// which no client or PO token bypasses. Attaching browser cookies to the
+// session is the reliable fix. Prefer explicit YOUTUBE_COOKIES, otherwise
+// grab the anonymous visitor cookies YouTube sets on a plain page fetch.
+async function getYouTubeCookies(): Promise<string | undefined> {
+  if (process.env.YOUTUBE_COOKIES) {
+    return process.env.YOUTUBE_COOKIES;
+  }
+  try {
+    const res = await fetch('https://www.youtube.com', {
+      headers: {
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+      },
+    });
+    const cookies = (res.headers.getSetCookie?.() ?? [])
+      .map((c) => c.split(';')[0])
+      .filter((c) => /^(VISITOR_INFO1_LIVE|SOCS|CONSENT|__Secure-YEC|PREF)=/.test(c))
+      .join('; ');
+    return cookies || undefined;
+  } catch (error) {
+    console.error('Failed to fetch anonymous YouTube cookies:', error);
+    return undefined;
+  }
+}
+
 export async function getInnertube(): Promise<Innertube> {
   if (!ytInstance) {
+    const cookie = await getYouTubeCookies();
     ytInstance = await Innertube.create({
       cache: new UniversalCache(false),
       generate_session_locally: true,
+      cookie,
     });
   }
   return ytInstance;
