@@ -349,17 +349,29 @@ async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
       // Attach the PO token to the player request itself. From datacenter IPs
       // (Vercel) YouTube withholds streaming_data unless a valid content-bound
       // PO token is sent via serviceIntegrityDimensions.poToken.
-      const info = await yt.getInfo(videoId, {
-        client: 'YTMUSIC',
-        po_token: poToken,
-      });
-      const format = info.chooseFormat({ quality: 'best', type: 'audio' });
-      if (format?.has_audio) {
-        const decodedUrl = await format.decipher(yt.session.player);
-        if (decodedUrl) {
-          const url = new URL(decodedUrl);
-          url.searchParams.set('pot', poToken);
-          return url.toString();
+      for (const client of ['YTMUSIC', 'WEB'] as const) {
+        let info: Awaited<ReturnType<typeof yt.getInfo>> | null = null;
+        try {
+          info = await yt.getInfo(videoId, { client, po_token: poToken });
+          const format = info.chooseFormat({ quality: 'best', type: 'audio' });
+          if (format?.has_audio) {
+            const decodedUrl = await format.decipher(yt.session.player);
+            if (decodedUrl) {
+              const url = new URL(decodedUrl);
+              url.searchParams.set('pot', poToken);
+              return url.toString();
+            }
+          }
+        } catch (error) {
+          const pr = (info as unknown as {
+            page?: Array<{ playability_status?: { status?: string; reason?: string } }>;
+          } | null)?.page?.[0]?.playability_status;
+          console.error(
+            `WebPO stream for ${videoId} (${client}) failed:`,
+            error instanceof Error ? error.message : error,
+            '| playability:',
+            pr
+          );
         }
       }
     }
