@@ -87,6 +87,7 @@ function resolveThumbnail(thumbnails: RawThumb[] | undefined, videoId: string): 
 }
 
 let ytInstance: Innertube | null = null;
+let ytAnonInstance: Innertube | null = null;
 
 // Vercel's datacenter IPs are heavily bot-flagged: YouTube answers every
 // player request with "Sign in to confirm you're not a bot" (LOGIN_REQUIRED),
@@ -126,6 +127,15 @@ export async function getInnertube(): Promise<Innertube> {
     });
   }
   return ytInstance;
+}
+
+export async function getAnonymousInnertube(): Promise<Innertube> {
+  if (!ytAnonInstance) {
+    ytAnonInstance = await Innertube.create({
+      cache: new UniversalCache(false),
+    });
+  }
+  return ytAnonInstance;
 }
 
 export async function searchTracks(query: string): Promise<Track[]> {
@@ -375,28 +385,36 @@ function cacheStreamUrl(videoId: string, url: string) {
 }
 
 async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
-  const [poToken, yt] = await Promise.all([getPoToken(videoId), getInnertube()]);
+  const [poToken, yt, ytAnon] = await Promise.all([
+    getPoToken(videoId),
+    getInnertube(),
+    getAnonymousInnertube(),
+  ]);
 
-  // Some clients (WEB, YTMUSIC) withhold streaming_data on datacenter IPs
-  // unless a PO token is attached to the player request; others (ANDROID_VR,
-  // VISIONOS, IOS, ANDROID, MWEB) serve it directly. Try them in order.
+  // Strategy order:
+  // 1. Authenticated session on YTMUSIC / WEB (cookies provide auth; do not pass anonymous PO token)
+  // 2. Anonymous session on mobile clients (ANDROID_VR, VISIONOS, IOS, ANDROID, MWEB) which require clean session without web cookies
+  // 3. Anonymous session on YTMUSIC / WEB with PO token
   const attempts: Array<{
-    client: 'ANDROID_VR' | 'VISIONOS' | 'YTMUSIC' | 'WEB' | 'IOS' | 'ANDROID' | 'MWEB';
+    instance: Innertube;
+    client: 'YTMUSIC' | 'WEB' | 'ANDROID_VR' | 'VISIONOS' | 'IOS' | 'ANDROID' | 'MWEB';
     withPot: boolean;
   }> = [
-    { client: 'ANDROID_VR', withPot: false },
-    { client: 'VISIONOS', withPot: false },
-    { client: 'YTMUSIC', withPot: true },
-    { client: 'WEB', withPot: true },
-    { client: 'IOS', withPot: false },
-    { client: 'ANDROID', withPot: false },
-    { client: 'MWEB', withPot: false },
+    { instance: yt, client: 'YTMUSIC', withPot: false },
+    { instance: yt, client: 'WEB', withPot: false },
+    { instance: ytAnon, client: 'ANDROID_VR', withPot: false },
+    { instance: ytAnon, client: 'VISIONOS', withPot: false },
+    { instance: ytAnon, client: 'IOS', withPot: false },
+    { instance: ytAnon, client: 'ANDROID', withPot: false },
+    { instance: ytAnon, client: 'MWEB', withPot: false },
+    { instance: ytAnon, client: 'YTMUSIC', withPot: true },
+    { instance: ytAnon, client: 'WEB', withPot: true },
   ];
 
-  for (const { client, withPot } of attempts) {
-    let info: Awaited<ReturnType<typeof yt.getInfo>> | null = null;
+  for (const { instance, client, withPot } of attempts) {
+    let info: Awaited<ReturnType<typeof instance.getInfo>> | null = null;
     try {
-      info = await yt.getInfo(videoId, {
+      info = await instance.getInfo(videoId, {
         client,
         po_token: withPot && poToken ? poToken : undefined,
       });
@@ -406,11 +424,11 @@ async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
         if (format.url) {
           decodedUrl = format.url;
         } else if (format.signature_cipher || format.cipher) {
-          decodedUrl = await format.decipher(yt.session.player);
+          decodedUrl = await format.decipher(instance.session.player);
         }
         if (decodedUrl) {
           const url = new URL(decodedUrl);
-          if (poToken) {
+          if (withPot && poToken) {
             url.searchParams.set('pot', poToken);
           }
           return url.toString();
@@ -421,7 +439,7 @@ async function getInnertubeStreamUrl(videoId: string): Promise<string | null> {
         page?: Array<{ playability_status?: { status?: string; reason?: string } }>;
       } | null)?.page?.[0]?.playability_status;
       console.error(
-        `Stream for ${videoId} (${client}${withPot ? '+pot' : ''}) failed:`,
+        `Stream for ${videoId} (${client}${withPot ? '+pot' : ''}${instance === yt ? '+auth' : '+anon'}) failed:`,
         error instanceof Error ? error.message : error,
         '| playability:',
         pr
