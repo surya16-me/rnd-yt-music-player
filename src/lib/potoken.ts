@@ -227,7 +227,13 @@ async function createMinter(): Promise<WebPoMinter> {
     headers: getHeaders(),
     body: JSON.stringify(payload),
   });
-  const integrityTokenJson = (await integrityTokenResponse.json()) as [
+  const integrityTokenText = await integrityTokenResponse.text();
+  if (!integrityTokenResponse.ok) {
+    console.error(
+      `[potoken] GenerateIT HTTP ${integrityTokenResponse.status}: ${integrityTokenText.slice(0, 300)}`
+    );
+  }
+  const integrityTokenJson = JSON.parse(integrityTokenText) as [
     integrityToken: string,
     estimatedTtlSecs: number,
     mintRefreshThreshold: number,
@@ -235,6 +241,9 @@ async function createMinter(): Promise<WebPoMinter> {
   ];
   const [integrityToken, estimatedTtlSecs, mintRefreshThreshold, websafeFallbackToken] =
     integrityTokenJson;
+  console.log(
+    `[potoken] GenerateIT ok, integrityToken len=${integrityToken?.length ?? 0}, ttl=${estimatedTtlSecs}`
+  );
 
   return await WebPoMinter.create(
     { integrityToken, estimatedTtlSecs, mintRefreshThreshold, websafeFallbackToken },
