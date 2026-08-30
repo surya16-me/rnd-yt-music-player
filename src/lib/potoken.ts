@@ -1,7 +1,7 @@
 import { BotGuardClient } from 'bgutils-js/botguard';
 import { buildURL, getHeaders, parseLooseJSON, USER_AGENT } from 'bgutils-js/utils';
 import { WebPoMinter } from 'bgutils-js/webpo';
-import { JSDOM } from 'jsdom';
+import { JSDOM, ResourceLoader } from 'jsdom';
 import { Platform } from 'youtubei.js';
 
 interface WebPoSignalOutputFunction {
@@ -32,7 +32,7 @@ async function loadBotGuard() {
   const dom = new JSDOM('<!DOCTYPE html><html><head><meta charset="UTF-8"><title></title></head><body></body></html>', {
     url: 'https://www.youtube.com',
     referrer: 'https://www.youtube.com/',
-    resources: { userAgent: USER_AGENT },
+    resources: new ResourceLoader({ userAgent: USER_AGENT }),
   });
 
   const pageResponse = await fetch('https://www.youtube.com', {
